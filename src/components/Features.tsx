@@ -29,7 +29,7 @@ const features = [
     icon: "hgi-shield-02",
     title: "Zéro risque légal",
     tag: null,
-    desc: "Tu ne touches jamais l'argent. FedaPay (licencié BCEAO) gère les transferts. Toi, tu orchestre.",
+    desc: "On ne touches jamais l'argent. FedaPay (licencié BCEAO) gère les transferts. Nous, nous l'orchestrons.",
   },
 ];
 

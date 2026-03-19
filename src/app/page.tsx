@@ -6,6 +6,7 @@ import HowItWorks from "@/components/HowItWorks";
 import Features from "@/components/Features";
 import Trust from "@/components/Trust";
 import Pricing from "@/components/Pricing";
+import Faq from "@/components/Faq";
 import CtaSection from "@/components/CtaSection";
 import Footer from "@/components/Footer";
 
@@ -20,6 +21,7 @@ export default function Home() {
       <Features />
       <Trust />
       <Pricing />
+      <Faq />
       <CtaSection />
       <Footer />
     </>

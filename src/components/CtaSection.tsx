@@ -42,6 +42,10 @@ export default function CtaSection() {
           S&apos;inscrire
         </button>
       </div>
+      <p className="fomo-text">
+        <i className="hgi-stroke hgi-fire" style={{ color: "var(--color-amber)" }} />
+        Les 100 premiers inscrits auront 0% de frais pendant 1 mois.
+      </p>
       {msg && (
         <p
           style={{

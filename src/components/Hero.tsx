@@ -29,6 +29,10 @@ export default function Hero() {
             Comment ça marche
           </Link>
         </div>
+        <p className="fomo-text anim-fade-up anim-delay-4">
+          <i className="hgi-stroke hgi-fire" style={{ color: "var(--color-amber)" }} />
+          Les 100 premiers inscrits auront 0% de frais pendant 1 mois.
+        </p>
       </div>
 
       <div className="hero-visual anim-fade-up anim-delay-4">
