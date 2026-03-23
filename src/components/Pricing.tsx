@@ -30,14 +30,41 @@ export default function Pricing() {
   const [amountText, setAmountText] = useState<string>("5000");
   const [selectedRateId, setSelectedRateId] = useState<string>(rates[0].id);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const [passFeesToClient, setPassFeesToClient] = useState<boolean>(false);
 
   const amount = parseInt(amountText) || 0;
   const selectedRate = rates.find((r) => r.id === selectedRateId) || rates[0];
   
-  const opFee = Math.round((amount * selectedRate.fee) / 100);
-  const gbFee = amount < 10000 ? Math.round(amount * 0.02 + 50) : Math.round(amount * 0.01 + 100);
-  const totalFee = opFee + gbFee;
-  const net = amount - totalFee;
+  let clientPays = amount;
+  let calculatedFee = 0;
+  let merchantNet = 0;
+
+  if (amount > 0) {
+    if (passFeesToClient) {
+      const rate = selectedRate.fee + (amount < 10000 ? 2 : 1);
+      const fixed = amount < 10000 ? 50 : 100;
+      clientPays = Math.floor((amount + fixed) / (1 - rate / 100));
+      
+      for(let i = 0; i < 500; i++) {
+         const tempOpFee = Math.round((clientPays * selectedRate.fee) / 100);
+         const tempGbFee = clientPays < 10000 ? Math.round(clientPays * 0.02 + 50) : Math.round(clientPays * 0.01 + 100);
+         const tempNet = clientPays - (tempOpFee + tempGbFee);
+         if (tempNet === amount) break;
+         else if (tempNet < amount) clientPays++;
+         else clientPays--;
+      }
+      
+      const finalOpFee = Math.round((clientPays * selectedRate.fee) / 100);
+      const finalGbFee = clientPays < 10000 ? Math.round(clientPays * 0.02 + 50) : Math.round(clientPays * 0.01 + 100);
+      calculatedFee = finalOpFee + finalGbFee;
+      merchantNet = clientPays - calculatedFee;
+    } else {
+      const finalOpFee = Math.round((amount * selectedRate.fee) / 100);
+      const finalGbFee = amount < 10000 ? Math.round(amount * 0.02 + 50) : Math.round(amount * 0.01 + 100);
+      calculatedFee = finalOpFee + finalGbFee;
+      merchantNet = amount - calculatedFee;
+    }
+  }
 
   return (
     <section className="pricing" id="pricing">
@@ -53,21 +80,23 @@ export default function Pricing() {
         </p>
 
         <div className="pricing-card">
-          <div className="pricing-amount" style={{ fontSize: "3.5rem" }}>
-            1%<span style={{ fontSize: "1.5rem", fontWeight: 500, margin: "0 8px" }}>à</span>2%
+          <div className="pricing-amount" style={{ fontSize: "3rem", display: "flex", alignItems: "baseline", justifyContent: "center" }}>
+            2,8%<span style={{ fontSize: "1.3rem", fontWeight: 500, margin: "0 8px" }}>à</span>6%
+            <span style={{ fontSize: "1rem", color: "var(--color-text-muted)", fontWeight: 500, marginLeft: "12px" }}>selon le pays</span>
           </div>
           <p className="pricing-desc" style={{ color: "var(--color-text)", fontWeight: 600, fontSize: "1.1rem" }}>
-            + Frais FedaPay (opérateur local)
+            Frais de plateforme et opérateurs inclus
           </p>
 
           <div className="pricing-tiers">
             <div className="tier">
-              <strong>&lt; 10 000 FCFA</strong>
-              <span>Frais FedaPay + 2% + 50F</span>
-            </div>
-            <div className="tier">
-              <strong>&ge; 10 000 FCFA</strong>
-              <span>Frais FedaPay + 1% + 100F</span>
+              <strong>Tarification Transparente</strong>
+              <span>
+                Un taux global unique.{" "}
+                <Link href="#simulator" style={{ color: "var(--color-accent)", textDecoration: "underline", fontWeight: 500 }}>
+                  Calculez votre marge nette ci-dessous.
+                </Link>
+              </span>
             </div>
           </div>
           <ul className="pricing-features">
@@ -85,7 +114,7 @@ export default function Pricing() {
         </div>
 
         {/* Simulator Section */}
-        <div className="simulator-section anim-fade-up">
+        <div id="simulator" className="simulator-section anim-fade-up">
           <h3 className="sim-title">Simulateur de revenus</h3>
           <p className="sim-subtitle">Découvre exactement ce qui te revient par transaction, sans frais cachés.</p>
           <div className="simulator-card">
@@ -99,6 +128,18 @@ export default function Pricing() {
                   onChange={(e) => setAmountText(e.target.value)}
                   min={100}
                 />
+                <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <input
+                    type="checkbox"
+                    id="passFees"
+                    checked={passFeesToClient}
+                    onChange={(e) => setPassFeesToClient(e.target.checked)}
+                    style={{ cursor: "pointer", width: "16px", height: "16px", accentColor: "var(--color-accent)" }}
+                  />
+                  <label htmlFor="passFees" style={{ fontSize: "14px", cursor: "pointer", color: "var(--color-text-muted)" }}>
+                    Faire supporter les frais au client
+                  </label>
+                </div>
               </div>
               <div>
                 <label className="sim-label">Pays et Moyen de paiement</label>
@@ -135,24 +176,16 @@ export default function Pricing() {
             </div>
             <div className="sim-outputs">
               <div className="sim-row">
-                <span>Paiement client</span>
-                <span>{amount.toLocaleString("fr-FR")} F</span>
-              </div>
-              <div className="sim-row">
-                <span>Frais FedaPay ({selectedRate.fee}%)</span>
-                <span>- {opFee.toLocaleString("fr-FR")} F</span>
-              </div>
-              <div className="sim-row">
-                <span>Commission Gatesberry</span>
-                <span>- {gbFee.toLocaleString("fr-FR")} F</span>
+                <span>{passFeesToClient ? "Le client paiera" : "Paiement client"}</span>
+                <span>{clientPays.toLocaleString("fr-FR")} F</span>
               </div>
               <div className="sim-row total">
-                <span>Total des frais</span>
-                <span>{totalFee.toLocaleString("fr-FR")} F</span>
+                <span>Frais de transaction tout inclus</span>
+                <span>- {calculatedFee.toLocaleString("fr-FR")} F</span>
               </div>
               <div className="sim-row net">
-                <span>Tu encaisses</span>
-                <span>{net.toLocaleString("fr-FR")} F</span>
+                <span>{passFeesToClient ? "Tu encaisses net" : "Tu encaisses"}</span>
+                <span>{merchantNet.toLocaleString("fr-FR")} F</span>
               </div>
             </div>
           </div>
@@ -160,25 +193,31 @@ export default function Pricing() {
 
         {/* Table Section */}
         <div className="rates-table-section anim-fade-up">
-          <h3 className="sim-title">Grille détaillée des frais FedaPay</h3>
-          <p className="sim-subtitle">Notre partenaire FedaPay applique des frais de traitement qui varient selon le pays.</p>
+          <h3 className="sim-title">Grille détaillée des frais par pays</h3>
+          <p className="sim-subtitle">Tous les frais de traitement (FedaPay + Gatesberry) sont combinés ici en un seul taux transparent.</p>
           <div className="table-wrapper">
             <table className="rates-table">
               <thead>
                 <tr>
                   <th>Pays</th>
                   <th>Réseaux Mobile Money</th>
-                  <th>Frais FedaPay</th>
+                  <th>Taux global (&lt; 10 000 F)</th>
+                  <th>Taux global (&ge; 10 000 F)</th>
                 </tr>
               </thead>
               <tbody>
-                {rates.map((r, idx) => (
-                  <tr key={idx}>
-                    <td><strong>{r.country}</strong></td>
-                    <td>{r.providers}</td>
-                    <td>{r.fee}%</td>
-                  </tr>
-                ))}
+                {rates.map((r, idx) => {
+                  const rateUnder = (r.fee + 2).toFixed(1).replace(".0", "").replace(".", ",");
+                  const rateOver = (r.fee + 1).toFixed(1).replace(".0", "").replace(".", ",");
+                  return (
+                    <tr key={idx}>
+                      <td><strong>{r.country}</strong></td>
+                      <td>{r.providers}</td>
+                      <td>{rateUnder}% + 50F</td>
+                      <td>{rateOver}% + 100F</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
