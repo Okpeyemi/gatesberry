@@ -16,6 +16,7 @@ export default function Navbar() {
           <Link href="#how">Fonctionnement</Link>
           <Link href="#features">Fonctionnalités</Link>
           <Link href="#pricing">Tarifs</Link>
+          <Link href="/login" className="font-semibold text-text hover:text-accent transition-colors">Connexion</Link>
         </div>
 
         <Link href="#waitlist" className="nav-cta">

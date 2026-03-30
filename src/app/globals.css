@@ -2,7 +2,7 @@
 @import url('https://cdn.hugeicons.com/font/hgi-stroke-rounded.css');
 @import "tailwindcss";
 
-@theme inline {
+@theme {
   --color-bg: #FFFDF7;
   --color-surface: #FFF8EC;
   --color-text: #1A1614;
