@@ -7,6 +7,7 @@ import type { User } from '@supabase/supabase-js'
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Accueil', icon: 'hgi-home-09', exact: true },
+  { href: '/dashboard/products', label: 'Produits', icon: 'hgi-cube-01', exact: false },
   { href: '/dashboard/payment-pages', label: 'Pages de paiement', icon: 'hgi-link-square-01', exact: false },
   { href: '/dashboard/settings', label: 'Paramètres', icon: 'hgi-settings-01', exact: false },
 ]
