@@ -18,7 +18,7 @@ export default async function PaymentPagesPage() {
       .order('created_at', { ascending: false }),
     supabase
       .from('products')
-      .select('id, name, description, price, currency, is_active, created_at')
+      .select('id, name, description, price, currency, billing_cycle, is_active, created_at')
       .eq('user_id', user!.id)
       .eq('is_active', true)
       .order('name'),

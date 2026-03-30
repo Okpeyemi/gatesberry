@@ -3,15 +3,26 @@
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
+export type BillingCycle = 'one_time' | 'monthly' | 'yearly'
+
 export interface Product {
   id: string
   name: string
   description: string | null
   price: number
   currency: string
+  billing_cycle: BillingCycle
   is_active: boolean
   created_at: string
 }
+
+const BILLING_CYCLES: { value: BillingCycle; label: string; icon: string; color: string; bg: string }[] = [
+  { value: 'one_time', label: 'Usage unique',  icon: 'hgi-shopping-cart-01', color: 'var(--color-purple)', bg: 'var(--color-purple-light)' },
+  { value: 'monthly',  label: 'Mensuel',       icon: 'hgi-calendar-02',      color: 'var(--color-blue)',   bg: 'var(--color-blue-light)'   },
+  { value: 'yearly',   label: 'Annuel',         icon: 'hgi-stars',            color: 'var(--color-amber)',  bg: 'var(--color-amber-light)'  },
+]
+
+const cycleOf = (v: BillingCycle) => BILLING_CYCLES.find((c) => c.value === v)!
 
 const formatPrice = (price: number) =>
   `${new Intl.NumberFormat('fr-FR').format(price)} FCFA`
@@ -24,11 +35,12 @@ function ProductModal({
 }: {
   editing: Product | null
   onClose: () => void
-  onSave: (data: { name: string; description: string; price: number }) => Promise<string | null>
+  onSave: (data: { name: string; description: string; price: number; billing_cycle: BillingCycle }) => Promise<string | null>
 }) {
   const [name, setName] = useState(editing?.name ?? '')
   const [description, setDescription] = useState(editing?.description ?? '')
   const [price, setPrice] = useState(editing ? String(editing.price) : '')
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(editing?.billing_cycle ?? 'one_time')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -47,7 +59,7 @@ function ProductModal({
     }
 
     setSaving(true)
-    const err = await onSave({ name: name.trim(), description: description.trim(), price: priceNum })
+    const err = await onSave({ name: name.trim(), description: description.trim(), price: priceNum, billing_cycle: billingCycle })
     setSaving(false)
     if (err) setError(err)
     else onClose()
@@ -172,7 +184,7 @@ function ProductModal({
           </div>
 
           {/* Prix */}
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '6px' }}>
               Prix <span style={{ color: 'var(--color-accent)' }}>*</span>
             </label>
@@ -202,6 +214,46 @@ function ProductModal({
               >
                 FCFA
               </span>
+            </div>
+          </div>
+
+          {/* Cycle de facturation */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '8px' }}>
+              Type de facturation <span style={{ color: 'var(--color-accent)' }}>*</span>
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+              {BILLING_CYCLES.map((c) => {
+                const active = billingCycle === c.value
+                return (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setBillingCycle(c.value)}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '12px 8px',
+                      borderRadius: '10px',
+                      border: active ? `2px solid ${c.color}` : '1.5px solid var(--color-border)',
+                      background: active ? c.bg : '#fff',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-body)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <i
+                      className={`hgi-stroke ${c.icon}`}
+                      style={{ fontSize: '18px', color: active ? c.color : 'var(--color-text-muted)' }}
+                    />
+                    <span style={{ fontSize: '12px', fontWeight: active ? 600 : 500, color: active ? c.color : 'var(--color-text-muted)' }}>
+                      {c.label}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
@@ -331,7 +383,7 @@ function ProductCard({
             flexShrink: 0,
           }}
         >
-          <i className="hgi-stroke hgi-cube-01" style={{ fontSize: '20px', color: 'var(--color-accent)' }} />
+          <i className="hgi-stroke hgi-package-01" style={{ fontSize: '20px', color: 'var(--color-accent)' }} />
         </div>
         <div style={{ minWidth: 0 }}>
           <h3
@@ -366,23 +418,33 @@ function ProductCard({
         </div>
       </div>
 
-      {/* Prix */}
-      <div
-        style={{
-          display: 'inline-flex',
-          alignSelf: 'flex-start',
-          alignItems: 'center',
-          gap: '6px',
-          background: 'var(--color-green-light)',
-          color: 'var(--color-green)',
-          fontSize: '14px',
-          fontWeight: 700,
-          padding: '5px 12px',
-          borderRadius: '100px',
-        }}
-      >
-        <i className="hgi-stroke hgi-money-bag-01" style={{ fontSize: '14px' }} />
-        {formatPrice(product.price)}
+      {/* Prix + cycle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'var(--color-green-light)',
+            color: 'var(--color-green)',
+            fontSize: '14px',
+            fontWeight: 700,
+            padding: '5px 12px',
+            borderRadius: '100px',
+          }}
+        >
+          <i className="hgi-stroke hgi-money-bag-01" style={{ fontSize: '14px' }} />
+          {formatPrice(product.price)}
+        </div>
+        {(() => {
+          const c = cycleOf(product.billing_cycle)
+          return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: c.bg, color: c.color, fontSize: '12px', fontWeight: 600, padding: '4px 10px', borderRadius: '100px' }}>
+              <i className={`hgi-stroke ${c.icon}`} style={{ fontSize: '12px' }} />
+              {c.label}
+            </span>
+          )
+        })()}
       </div>
 
       {/* Actions */}
@@ -522,7 +584,7 @@ export default function ProductsClient({
   const openEdit = (p: Product) => { setEditingProduct(p); setShowModal(true) }
   const closeModal = () => setShowModal(false)
 
-  const handleSave = async (data: { name: string; description: string; price: number }): Promise<string | null> => {
+  const handleSave = async (data: { name: string; description: string; price: number; billing_cycle: BillingCycle }): Promise<string | null> => {
     if (editingProduct) {
       const { data: updated, error } = await supabase
         .from('products')
@@ -530,6 +592,7 @@ export default function ProductsClient({
           name: data.name,
           description: data.description || null,
           price: data.price,
+          billing_cycle: data.billing_cycle,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingProduct.id)
@@ -545,6 +608,7 @@ export default function ProductsClient({
           name: data.name,
           description: data.description || null,
           price: data.price,
+          billing_cycle: data.billing_cycle,
           currency: 'XOF',
         })
         .select()
@@ -643,7 +707,7 @@ export default function ProductsClient({
               margin: '0 auto 20px',
             }}
           >
-            <i className="hgi-stroke hgi-cube-01" style={{ fontSize: '26px', color: 'var(--color-text-muted)' }} />
+            <i className="hgi-stroke hgi-package-01" style={{ fontSize: '26px', color: 'var(--color-text-muted)' }} />
           </div>
           <h2
             style={{
