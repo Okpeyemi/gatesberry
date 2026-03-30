@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import PaymentPagesClient from './PaymentPagesClient'
+import type { PaymentPage } from './PaymentPagesClient'
 
 export default async function PaymentPagesPage() {
   const supabase = await createClient()
@@ -13,7 +14,7 @@ export default async function PaymentPagesPage() {
   const [{ data: pages }, { data: products }] = await Promise.all([
     supabase
       .from('payment_pages')
-      .select('id, title, description, slug, is_active, product_id, created_at, products(name, price)')
+      .select('id, title, description, slug, is_active, created_at, payment_page_products(product_id, sort_order, products(id, name, price, billing_cycle))')
       .eq('user_id', user!.id)
       .order('created_at', { ascending: false }),
     supabase
@@ -31,7 +32,7 @@ export default async function PaymentPagesPage() {
   return (
     <div style={{ padding: '40px 48px', flex: 1 }}>
       <PaymentPagesClient
-        initialPages={(pages ?? []) as any}
+        initialPages={(pages ?? []) as PaymentPage[]}
         products={products ?? []}
         userId={user!.id}
         origin={origin}
