@@ -52,11 +52,6 @@ export default function PayPageClient({
     >
       <div style={{ width: '100%', maxWidth: '440px' }} className="anim-fade-up">
 
-        {/* Logo */}
-        <Link href="/" className="logo" style={{ display: 'inline-flex', marginBottom: '36px' }}>
-          Gatesberry<span className="logo-dot" />
-        </Link>
-
         {/* Card */}
         <div
           style={{

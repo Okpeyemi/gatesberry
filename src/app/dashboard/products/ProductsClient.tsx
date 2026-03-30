@@ -383,7 +383,7 @@ function ProductCard({
             flexShrink: 0,
           }}
         >
-          <i className="hgi-stroke hgi-package-01" style={{ fontSize: '20px', color: 'var(--color-accent)' }} />
+          <i className="hgi-stroke hgi-package" style={{ fontSize: '20px', color: 'var(--color-accent)' }} />
         </div>
         <div style={{ minWidth: 0 }}>
           <h3
@@ -707,7 +707,7 @@ export default function ProductsClient({
               margin: '0 auto 20px',
             }}
           >
-            <i className="hgi-stroke hgi-package-01" style={{ fontSize: '26px', color: 'var(--color-text-muted)' }} />
+            <i className="hgi-stroke hgi-package" style={{ fontSize: '26px', color: 'var(--color-text-muted)' }} />
           </div>
           <h2
             style={{
