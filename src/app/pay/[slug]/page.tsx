@@ -26,6 +26,7 @@ export default async function PublicPayPage({
 
   return (
     <PayPageClient
+      paymentPageId={page.id}
       title={page.title}
       description={page.description}
       products={products}
