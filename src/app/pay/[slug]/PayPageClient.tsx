@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import Script from 'next/script'
 
@@ -95,6 +95,34 @@ const CYCLE: Record<string, { label: string; color: string; bg: string; renewabl
 const formatPrice = (price: number) =>
   `${new Intl.NumberFormat('fr-FR').format(price)} FCFA`
 
+/* ── Taux opérateur par (pays, provider) ───────────────────── */
+const OP_FEES: Record<string, Record<string, number>> = {
+  bj: { mtn: 1.8, moov: 1.8, celtiis: 1.8 },
+  ci: { wave: 4.0, mtn: 4.0, orange: 3.3 },
+  sn: { wave: 4.0, orange: 2.9, mixx: 2.0 },
+  tg: { moov: 2.5, mixx: 3.5 },
+  ml: { orange: 4.0 },
+  bf: { moov: 4.0, orange: 4.0 },
+  ne: { airtel: 4.0 },
+}
+
+function computeClientAmount(merchantAmount: number, countryCode: string, providerId: string) {
+  if (merchantAmount <= 0 || !countryCode || !providerId) return { clientPays: 0, totalFee: 0 }
+  const opRate = OP_FEES[countryCode]?.[providerId] ?? 3.0
+  let cp = Math.ceil((merchantAmount + (merchantAmount < 10000 ? 50 : 100)) / (1 - (opRate + (merchantAmount < 10000 ? 2 : 1)) / 100))
+  for (let i = 0; i < 500; i++) {
+    const opFee = Math.round((cp * opRate) / 100)
+    const gbFee = cp < 10000 ? Math.round(cp * 0.02 + 50) : Math.round(cp * 0.01 + 100)
+    const net = cp - (opFee + gbFee)
+    if (net === merchantAmount) break
+    else if (net < merchantAmount) cp++
+    else cp--
+  }
+  const opFee = Math.round((cp * opRate) / 100)
+  const gbFee = cp < 10000 ? Math.round(cp * 0.02 + 50) : Math.round(cp * 0.01 + 100)
+  return { clientPays: cp, totalFee: opFee + gbFee }
+}
+
 /* ── Composant ─────────────────────────────────────────────── */
 
 export default function PayPageClient({
@@ -138,6 +166,12 @@ export default function PayPageClient({
   const multipleProducts = products.length > 1
   const country = COUNTRIES.find((c) => c.code === countryCode)
   const providers = country?.providers ?? []
+
+  // Calcul du montant total (frais inclus)
+  const { clientPays, totalFee } = useMemo(
+    () => computeClientAmount(selected?.price ?? 0, countryCode, providerId),
+    [selected?.price, countryCode, providerId]
+  )
 
   const canPay =
     firstName.trim().length >= 2 &&
@@ -571,6 +605,36 @@ export default function PayPageClient({
                 </div>
               )}
 
+              {/* ── Récap frais (visible une fois pays + réseau choisis) ── */}
+              {selected && clientPays > 0 && totalFee > 0 && (
+                <div
+                  style={{
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '12px',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    fontSize: '13px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-text-muted)' }}>
+                    <span>Prix du produit</span>
+                    <span>{formatPrice(selected.price)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-text-muted)' }}>
+                    <span>Frais de transaction</span>
+                    <span>+ {formatPrice(totalFee)}</span>
+                  </div>
+                  <div style={{ height: '1px', background: 'var(--color-border)' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--color-text)' }}>
+                    <span>Total à payer</span>
+                    <span>{formatPrice(clientPays)}</span>
+                  </div>
+                </div>
+              )}
+
               {/* ── Erreur ── */}
               {error && (
                 <div
@@ -629,7 +693,7 @@ export default function PayPageClient({
                 ) : (
                   <>
                     <i className="hgi-stroke hgi-smart-phone-01" style={{ fontSize: '18px' }} />
-                    Payer {selected ? formatPrice(selected.price) : ''}
+                    Payer {clientPays > 0 ? formatPrice(clientPays) : selected ? formatPrice(selected.price) : ''}
                   </>
                 )}
               </button>

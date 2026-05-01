@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
 export type BillingCycle = 'one_time' | 'monthly' | 'yearly'
@@ -567,6 +567,113 @@ function ProductCard({
   )
 }
 
+// ── Simulator ─────────────────────────────────────────────
+const SIM_RATES = [
+  { id: 'bj-all',     country: 'Bénin',          providers: 'MTN, Moov, Celtiis', fee: 1.8 },
+  { id: 'ci-wave',    country: 'Côte d\'Ivoire',  providers: 'Wave, MTN',          fee: 4.0 },
+  { id: 'ci-orange',  country: 'Côte d\'Ivoire',  providers: 'Orange Money',       fee: 3.3 },
+  { id: 'sn-wave',    country: 'Sénégal',         providers: 'Wave',               fee: 4.0 },
+  { id: 'sn-orange',  country: 'Sénégal',         providers: 'Orange Money',       fee: 2.9 },
+  { id: 'sn-mixx',    country: 'Sénégal',         providers: 'Mixx by Yas',        fee: 2.0 },
+  { id: 'tg-moov',    country: 'Togo',            providers: 'Moov Money',         fee: 2.5 },
+  { id: 'tg-mixx',    country: 'Togo',            providers: 'Mixx by Yas',        fee: 3.5 },
+  { id: 'ml-orange',  country: 'Mali',            providers: 'Orange Money',       fee: 4.0 },
+  { id: 'bf-all',     country: 'Burkina-Faso',    providers: 'Moov, Orange',       fee: 4.0 },
+  { id: 'ne-airtel',  country: 'Niger',           providers: 'Airtel Money',       fee: 4.0 },
+]
+
+function RevenueSimulator() {
+  const [amountText, setAmountText] = useState('5000')
+  const [selectedRateId, setSelectedRateId] = useState(SIM_RATES[0].id)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+
+  const amount = parseInt(amountText) || 0
+  const selectedRate = SIM_RATES.find((r) => r.id === selectedRateId) || SIM_RATES[0]
+
+  const { clientPays, calculatedFee, merchantNet } = useMemo(() => {
+    if (amount <= 0) return { clientPays: 0, calculatedFee: 0, merchantNet: 0 }
+
+    // Les frais sont toujours supportés par le client
+    let cp = Math.ceil((amount + (amount < 10000 ? 50 : 100)) / (1 - (selectedRate.fee + (amount < 10000 ? 2 : 1)) / 100))
+    for (let i = 0; i < 500; i++) {
+      const tempOpFee = Math.round((cp * selectedRate.fee) / 100)
+      const tempGbFee = cp < 10000 ? Math.round(cp * 0.02 + 50) : Math.round(cp * 0.01 + 100)
+      const tempNet = cp - (tempOpFee + tempGbFee)
+      if (tempNet === amount) break
+      else if (tempNet < amount) cp++
+      else cp--
+    }
+    const finalOpFee = Math.round((cp * selectedRate.fee) / 100)
+    const finalGbFee = cp < 10000 ? Math.round(cp * 0.02 + 50) : Math.round(cp * 0.01 + 100)
+    const fee = finalOpFee + finalGbFee
+    return { clientPays: cp, calculatedFee: fee, merchantNet: cp - fee }
+  }, [amount, selectedRate])
+
+  return (
+    <div className="simulator-section" style={{ marginTop: '40px' }}>
+      <h3 className="sim-title">Simulateur de revenus</h3>
+      <p className="sim-subtitle">Découvre exactement ce qui te revient par transaction, sans frais cachés.</p>
+      <div className="simulator-card">
+        <div className="sim-inputs">
+          <div>
+            <label className="sim-label">Montant vendu (FCFA)</label>
+            <input
+              type="number"
+              className="sim-input"
+              value={amountText}
+              onChange={(e) => setAmountText(e.target.value)}
+              min={100}
+            />
+          </div>
+          <div>
+            <label className="sim-label">Pays et Moyen de paiement</label>
+            <div style={{ position: 'relative' }}>
+              <div
+                className={`custom-select ${isDropdownOpen ? 'open' : ''}`}
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              >
+                <span>{selectedRate.country} - {selectedRate.providers} ({selectedRate.fee}%)</span>
+                <i className={`hgi-stroke hgi-arrow-down-01 select-arrow ${isDropdownOpen ? 'open' : ''}`} />
+              </div>
+              {isDropdownOpen && (
+                <>
+                  <div className="custom-select-backdrop" onClick={() => setIsDropdownOpen(false)} />
+                  <div className="custom-select-menu">
+                    {SIM_RATES.map((r) => (
+                      <div
+                        key={r.id}
+                        className={`custom-select-option ${r.id === selectedRateId ? 'selected' : ''}`}
+                        onClick={() => { setSelectedRateId(r.id); setIsDropdownOpen(false) }}
+                      >
+                        <span className="opt-country">{r.country}</span>
+                        <span className="opt-details">{r.providers} ({r.fee}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="sim-outputs">
+          <div className="sim-row">
+            <span>Le client paiera</span>
+            <span>{clientPays.toLocaleString('fr-FR')} F</span>
+          </div>
+          <div className="sim-row total">
+            <span>Frais de transaction tout inclus</span>
+            <span>- {calculatedFee.toLocaleString('fr-FR')} F</span>
+          </div>
+          <div className="sim-row net">
+            <span>Tu encaisses net</span>
+            <span>{merchantNet.toLocaleString('fr-FR')} F</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main client component ──────────────────────────────────
 export default function ProductsClient({
   initialProducts,
@@ -762,6 +869,9 @@ export default function ProductsClient({
           ))}
         </div>
       )}
+
+      {/* ── Simulateur ── */}
+      <RevenueSimulator />
 
       {/* ── Modal ── */}
       {showModal && (

@@ -8,6 +8,70 @@ const FEDAPAY_BASE =
     ? 'https://api.fedapay.com/v1'
     : 'https://sandbox-api.fedapay.com/v1'
 
+// Taux opérateur par (pays, provider)
+const OPERATOR_FEES: Record<string, Record<string, number>> = {
+  bj: { mtn: 1.8, moov: 1.8, celtiis: 1.8 },
+  ci: { wave: 4.0, mtn: 4.0, orange: 3.3 },
+  sn: { wave: 4.0, orange: 2.9, mixx: 2.0 },
+  tg: { moov: 2.5, mixx: 3.5 },
+  ml: { orange: 4.0 },
+  bf: { moov: 4.0, orange: 4.0 },
+  ne: { airtel: 4.0 },
+}
+
+/**
+ * Calcule le montant total affiché au client (frais opérateur + Gatesberry inclus)
+ * pour que le marchand reçoive exactement `merchantAmount` net.
+ */
+function computeClientAmount(merchantAmount: number, country: string, provider: string) {
+  const opRate = OPERATOR_FEES[country]?.[provider] ?? 3.0
+
+  const gbRate = merchantAmount < 10000 ? 2 : 1
+  const gbFixed = merchantAmount < 10000 ? 50 : 100
+  const totalRate = opRate + gbRate
+  let clientPays = Math.ceil((merchantAmount + gbFixed) / (1 - totalRate / 100))
+
+  for (let i = 0; i < 500; i++) {
+    const opFee = Math.round((clientPays * opRate) / 100)
+    const gbFee = clientPays < 10000
+      ? Math.round(clientPays * 0.02 + 50)
+      : Math.round(clientPays * 0.01 + 100)
+    const net = clientPays - (opFee + gbFee)
+    if (net === merchantAmount) break
+    else if (net < merchantAmount) clientPays++
+    else clientPays--
+  }
+
+  const opFee = Math.round((clientPays * opRate) / 100)
+  const gbFee = clientPays < 10000
+    ? Math.round(clientPays * 0.02 + 50)
+    : Math.round(clientPays * 0.01 + 100)
+
+  return { clientPays, opFee, gbFee, totalFee: opFee + gbFee }
+}
+
+/**
+ * Calcule le montant à envoyer à FedaPay pour que le client soit débité
+ * exactement `targetClientPays`. FedaPay ajoute ses frais (opRate%) par-dessus
+ * le montant de la transaction → on envoie moins.
+ *
+ *   fedapayAmount + round(fedapayAmount * opRate / 100) = targetClientPays
+ */
+function reverseFedapayAmount(targetClientPays: number, country: string, provider: string) {
+  const opRate = OPERATOR_FEES[country]?.[provider] ?? 3.0
+  let x = Math.floor(targetClientPays / (1 + opRate / 100))
+
+  for (let i = 0; i < 500; i++) {
+    const fee = Math.round((x * opRate) / 100)
+    const total = x + fee
+    if (total === targetClientPays) break
+    else if (total < targetClientPays) x++
+    else x--
+  }
+
+  return x
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -57,13 +121,22 @@ export async function POST(req: NextRequest) {
 
     const merchantRef = `GB-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
+    // ── Calcul des frais (toujours supportés par le client) ───
+    const { clientPays, gbFee } = computeClientAmount(product.price, country, provider)
+
+    // Montant à envoyer à FedaPay : plus bas que clientPays pour que
+    // FedaPay + ses frais = exactement clientPays (le montant affiché au client)
+    const fedapayAmount = reverseFedapayAmount(clientPays, country, provider)
+
+    console.log(`Fees: product=${product.price}, clientPays=${clientPays}, fedapayAmount=${fedapayAmount}, gbFee=${gbFee}`)
+
     // ── Appel direct à l'API REST FedaPay ─────────────────────
 
     // Normaliser le numéro de téléphone
     const cleanPhone = phone.replace(/\s+/g, '')
 
-    // 1. Créer la transaction
-    const callbackUrl = `${req.nextUrl.origin}/payment/callback`
+    // 1. Créer la transaction (montant réduit → FedaPay ajoute ses frais → client paie clientPays)
+    const callbackUrl = `${req.nextUrl.origin}/api/payment/callback`
 
     const txRes = await fetch(`${FEDAPAY_BASE}/transactions`, {
       method: 'POST',
@@ -73,7 +146,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         description: `${page.title} — ${product.name}`,
-        amount: product.price,
+        amount: fedapayAmount,
         currency: { iso: 'XOF' },
         callback_url: callbackUrl,
         merchant_reference: merchantRef,
@@ -116,13 +189,16 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Sauvegarder la transaction en base (statut pending)
-    await supabase.from('transactions').insert({
+    console.log('[Pay] Saving with fedapay_transaction_id:', fedapayTxId, typeof fedapayTxId)
+    const { error: insertErr } = await supabase.from('transactions').insert({
       payment_page_id: paymentPageId,
       product_id: productId,
       merchant_id: page.user_id,
       fedapay_transaction_id: fedapayTxId,
       merchant_reference: merchantRef,
       amount: product.price,
+      amount_charged: clientPays,
+      gb_fee: gbFee,
       status: 'pending',
       customer_phone: cleanPhone,
       customer_firstname: firstName,
@@ -131,6 +207,8 @@ export async function POST(req: NextRequest) {
       provider: provider,
       auto_renew: autoRenew ?? false,
     })
+    if (insertErr) console.error('[Pay] INSERT error:', insertErr)
+    else console.log('[Pay] INSERT success for fedapay_transaction_id:', fedapayTxId)
 
     return NextResponse.json({ token, url: paymentUrl, transactionId: fedapayTxId })
   } catch (err) {

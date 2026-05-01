@@ -30,40 +30,33 @@ export default function Pricing() {
   const [amountText, setAmountText] = useState<string>("5000");
   const [selectedRateId, setSelectedRateId] = useState<string>(rates[0].id);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const [passFeesToClient, setPassFeesToClient] = useState<boolean>(false);
 
   const amount = parseInt(amountText) || 0;
   const selectedRate = rates.find((r) => r.id === selectedRateId) || rates[0];
-  
-  let clientPays = amount;
+
+  let clientPays = 0;
   let calculatedFee = 0;
   let merchantNet = 0;
 
   if (amount > 0) {
-    if (passFeesToClient) {
-      const rate = selectedRate.fee + (amount < 10000 ? 2 : 1);
-      const fixed = amount < 10000 ? 50 : 100;
-      clientPays = Math.floor((amount + fixed) / (1 - rate / 100));
-      
-      for(let i = 0; i < 500; i++) {
-         const tempOpFee = Math.round((clientPays * selectedRate.fee) / 100);
-         const tempGbFee = clientPays < 10000 ? Math.round(clientPays * 0.02 + 50) : Math.round(clientPays * 0.01 + 100);
-         const tempNet = clientPays - (tempOpFee + tempGbFee);
-         if (tempNet === amount) break;
-         else if (tempNet < amount) clientPays++;
-         else clientPays--;
-      }
-      
-      const finalOpFee = Math.round((clientPays * selectedRate.fee) / 100);
-      const finalGbFee = clientPays < 10000 ? Math.round(clientPays * 0.02 + 50) : Math.round(clientPays * 0.01 + 100);
-      calculatedFee = finalOpFee + finalGbFee;
-      merchantNet = clientPays - calculatedFee;
-    } else {
-      const finalOpFee = Math.round((amount * selectedRate.fee) / 100);
-      const finalGbFee = amount < 10000 ? Math.round(amount * 0.02 + 50) : Math.round(amount * 0.01 + 100);
-      calculatedFee = finalOpFee + finalGbFee;
-      merchantNet = amount - calculatedFee;
+    // Les frais sont toujours supportés par le client
+    const rate = selectedRate.fee + (amount < 10000 ? 2 : 1);
+    const fixed = amount < 10000 ? 50 : 100;
+    clientPays = Math.floor((amount + fixed) / (1 - rate / 100));
+
+    for(let i = 0; i < 500; i++) {
+       const tempOpFee = Math.round((clientPays * selectedRate.fee) / 100);
+       const tempGbFee = clientPays < 10000 ? Math.round(clientPays * 0.02 + 50) : Math.round(clientPays * 0.01 + 100);
+       const tempNet = clientPays - (tempOpFee + tempGbFee);
+       if (tempNet === amount) break;
+       else if (tempNet < amount) clientPays++;
+       else clientPays--;
     }
+
+    const finalOpFee = Math.round((clientPays * selectedRate.fee) / 100);
+    const finalGbFee = clientPays < 10000 ? Math.round(clientPays * 0.02 + 50) : Math.round(clientPays * 0.01 + 100);
+    calculatedFee = finalOpFee + finalGbFee;
+    merchantNet = clientPays - calculatedFee;
   }
 
   return (
@@ -128,18 +121,6 @@ export default function Pricing() {
                   onChange={(e) => setAmountText(e.target.value)}
                   min={100}
                 />
-                <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <input
-                    type="checkbox"
-                    id="passFees"
-                    checked={passFeesToClient}
-                    onChange={(e) => setPassFeesToClient(e.target.checked)}
-                    style={{ cursor: "pointer", width: "16px", height: "16px", accentColor: "var(--color-accent)" }}
-                  />
-                  <label htmlFor="passFees" style={{ fontSize: "14px", cursor: "pointer", color: "var(--color-text-muted)" }}>
-                    Faire supporter les frais au client
-                  </label>
-                </div>
               </div>
               <div>
                 <label className="sim-label">Pays et Moyen de paiement</label>
@@ -176,7 +157,7 @@ export default function Pricing() {
             </div>
             <div className="sim-outputs">
               <div className="sim-row">
-                <span>{passFeesToClient ? "Le client paiera" : "Paiement client"}</span>
+                <span>Le client paiera</span>
                 <span>{clientPays.toLocaleString("fr-FR")} F</span>
               </div>
               <div className="sim-row total">
@@ -184,7 +165,7 @@ export default function Pricing() {
                 <span>- {calculatedFee.toLocaleString("fr-FR")} F</span>
               </div>
               <div className="sim-row net">
-                <span>{passFeesToClient ? "Tu encaisses net" : "Tu encaisses"}</span>
+                <span>Tu encaisses net</span>
                 <span>{merchantNet.toLocaleString("fr-FR")} F</span>
               </div>
             </div>
