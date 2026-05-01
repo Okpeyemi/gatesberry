@@ -1,61 +1,17 @@
-import { createServerClient } from '@supabase/ssr'
 import Link from 'next/link'
 
-const FEDAPAY_SECRET = process.env.FEDAPAY_SECRET_KEY!
-const FEDAPAY_ENV = process.env.FEDAPAY_ENVIRONMENT ?? 'sandbox'
-const FEDAPAY_BASE =
-  FEDAPAY_ENV === 'live'
-    ? 'https://api.fedapay.com/v1'
-    : 'https://sandbox-api.fedapay.com/v1'
+export const dynamic = 'force-dynamic'
 
 export default async function PaymentCallbackPage({
   searchParams,
 }: {
-  searchParams: Promise<{ id?: string; status?: string }>
+  searchParams: Promise<{ id?: string; status?: string; receipt?: string }>
 }) {
-  const { id, status } = await searchParams
-
-  let verified = false
-  let finalStatus = status ?? 'unknown'
-  let txDetails: { amount?: number; description?: string } = {}
-
-  if (id) {
-    // Vérifier la transaction auprès de FedaPay (ne JAMAIS se fier aux query params seuls)
-    try {
-      const res = await fetch(`${FEDAPAY_BASE}/transactions/${id}`, {
-        headers: {
-          Authorization: `Bearer ${FEDAPAY_SECRET}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        const tx = data.v1?.transaction ?? data
-        finalStatus = tx.status ?? finalStatus
-        txDetails = { amount: tx.amount, description: tx.description }
-        verified = true
-
-        // Mettre à jour le statut dans Supabase
-        const supabase = createServerClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          { cookies: { getAll: () => [], setAll: () => {} } }
-        )
-
-        await supabase
-          .from('transactions')
-          .update({ status: finalStatus })
-          .eq('fedapay_transaction_id', Number(id))
-      }
-    } catch (err) {
-      console.error('Callback verification error:', err)
-    }
-  }
+  const { id, status, receipt } = await searchParams
+  const finalStatus = status ?? 'unknown'
 
   const isSuccess = finalStatus === 'approved'
   const isPending = finalStatus === 'pending'
-  const isFailed = finalStatus === 'canceled' || finalStatus === 'declined'
 
   return (
     <div
@@ -156,32 +112,37 @@ export default async function PaymentCallbackPage({
                   : 'Le paiement n\'a pas abouti. Veuillez réessayer ou contacter le marchand.'}
             </p>
 
-            {/* Détails */}
-            {verified && txDetails.amount && (
-              <div
-                style={{
-                  width: '100%',
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '12px',
-                  padding: '14px 16px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Montant</span>
-                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '16px', color: 'var(--color-text)' }}>
-                  {new Intl.NumberFormat('fr-FR').format(txDetails.amount)} FCFA
-                </span>
-              </div>
-            )}
-
             {/* Référence */}
             {id && (
               <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                 Réf. transaction : <strong>{id}</strong>
               </p>
+            )}
+
+            {/* Bouton télécharger le reçu */}
+            {isSuccess && receipt && (
+              <a
+                href={receipt}
+                download={`recu-${id}.pdf`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginTop: '8px',
+                  padding: '10px 20px',
+                  borderRadius: '12px',
+                  background: 'var(--color-accent)',
+                  color: '#fff',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-body)',
+                  textDecoration: 'none',
+                  transition: 'opacity 0.15s',
+                }}
+              >
+                <i className="hgi-stroke hgi-download-04" style={{ fontSize: '16px' }} />
+                Télécharger le reçu
+              </a>
             )}
           </div>
         </div>
