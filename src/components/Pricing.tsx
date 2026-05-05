@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { FEDAPAY_RATES_DISPLAY as rates } from "@/lib/fedapay/fees";
 
 const pricingFeatures = [
   "Pages de paiement illimitées",
@@ -10,20 +11,6 @@ const pricingFeatures = [
   "Support WhatsApp dédié",
   "Aucun frais de mise en place",
   "Aucun minimum de transaction",
-];
-
-const rates = [
-  { id: "bj-all", country: "Bénin", providers: "MTN, Moov, Celtiis", fee: 1.8 },
-  { id: "ci-wave", country: "Côte d'Ivoire", providers: "Wave, MTN", fee: 4.0 },
-  { id: "ci-orange", country: "Côte d'Ivoire", providers: "Orange Money", fee: 3.3 },
-  { id: "sn-wave", country: "Sénégal", providers: "Wave", fee: 4.0 },
-  { id: "sn-orange", country: "Sénégal", providers: "Orange Money", fee: 2.9 },
-  { id: "sn-mixx", country: "Sénégal", providers: "Mixx by Yas", fee: 2.0 },
-  { id: "tg-moov", country: "Togo", providers: "Moov Money", fee: 2.5 },
-  { id: "tg-mixx", country: "Togo", providers: "Mixx by Yas", fee: 3.5 },
-  { id: "ml-orange", country: "Mali", providers: "Orange Money", fee: 4.0 },
-  { id: "bf-all", country: "Burkina-Faso", providers: "Moov, Orange", fee: 4.0 },
-  { id: "ne-airtel", country: "Niger", providers: "Airtel Money", fee: 4.0 },
 ];
 
 export default function Pricing() {
