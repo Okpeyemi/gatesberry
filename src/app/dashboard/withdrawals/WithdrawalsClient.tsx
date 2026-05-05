@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useMemo } from 'react'
+import { Fragment, useState, useMemo } from 'react'
 import { FEDAPAY_OPERATOR_FEES } from '@/lib/fedapay/fees'
+import { PAYOUT_FEE_TIERS } from '@/lib/fedapay/payout-fees'
 
 type Withdrawal = {
   id: string
@@ -119,6 +120,9 @@ export default function WithdrawalsClient({
         </p>
       )}
 
+      {/* Grille tarifaire */}
+      <FeesGrid />
+
       {/* Tableau historique */}
       {withdrawals.length === 0 ? (
         <div style={{ textAlign:'center', padding:'80px 24px', color:'var(--color-text-muted)' }}>
@@ -171,6 +175,48 @@ export default function WithdrawalsClient({
           onSuccess={async () => { setModalOpen(false); await handleRefresh() }}
         />
       )}
+    </div>
+  )
+}
+
+function FeesGrid() {
+  const rows = PAYOUT_FEE_TIERS.map((t, i) => {
+    const lo = i === 0 ? 0 : (PAYOUT_FEE_TIERS[i - 1].max + 1)
+    const hi = Number.isFinite(t.max) ? t.max : null
+    return {
+      label: hi == null ? `${formatAmount(lo)} et plus` : `${formatAmount(lo)} – ${formatAmount(hi)}`,
+      fee: t.fee,
+    }
+  })
+
+  return (
+    <div style={{
+      background:'#fff', border:'1px solid var(--color-border)', borderRadius:14,
+      padding:'18px 22px', marginBottom:24,
+    }}>
+      <h3 style={{
+        fontFamily:'var(--font-display)', fontWeight:700, fontSize:15,
+        marginBottom:4, color:'var(--color-text)',
+      }}>
+        Frais de retrait FedaPay
+      </h3>
+      <p style={{ fontSize:12, color:'var(--color-text-muted)', marginBottom:14 }}>
+        Forfait identique pour tous les opérateurs (MTN, Moov, T-Money…), variable selon la tranche du montant retiré.
+      </p>
+      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:'8px 16px', fontSize:13 }}>
+        <span style={{ color:'var(--color-text-muted)', fontWeight:600, fontSize:11, textTransform:'uppercase' }}>
+          Tranche (XOF)
+        </span>
+        <span style={{ color:'var(--color-text-muted)', fontWeight:600, fontSize:11, textTransform:'uppercase', textAlign:'right' }}>
+          Frais
+        </span>
+        {rows.map((r) => (
+          <Fragment key={r.label}>
+            <span>{r.label}</span>
+            <span style={{ textAlign:'right', fontWeight:600 }}>{formatAmount(r.fee)} XOF</span>
+          </Fragment>
+        ))}
+      </div>
     </div>
   )
 }
