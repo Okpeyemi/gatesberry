@@ -16,6 +16,10 @@ const supa = createClient(SUPABASE_URL, SERVICE_ROLE, {
 /**
  * Logique partagée admin manuel + cron auto-approve.
  * Input body: { withdrawal_id: string, reviewed_by?: string | null }
+ *
+ * Idempotent : si fedapay_payout_id est déjà connu (création précédente
+ * ayant réussi mais start ayant échoué), on saute le POST /payouts et
+ * on rejoue directement le PUT /start.
  */
 Deno.serve(async (req) => {
   try {
@@ -51,33 +55,43 @@ Deno.serve(async (req) => {
       )
     }
 
-    // 1. POST /v1/payouts (création — idempotent via merchant_reference)
-    const createRes = await fetch(`${FEDAPAY_BASE}/payouts`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${FEDAPAY_SECRET}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount: locked.fedapay_amount,
-        currency: { iso: 'XOF' },
-        mode: locked.receiver_provider,
-        merchant_reference: locked.merchant_reference,
-        customer: {
-          firstname: (locked.receiver_name as string).split(' ')[0],
-          lastname: (locked.receiver_name as string).split(' ').slice(1).join(' ') || locked.receiver_name,
-          phone_number: { number: locked.receiver_phone, country: locked.receiver_country },
-        },
-      }),
-    })
+    let fedapayId: number | null = locked.fedapay_payout_id ?? null
 
-    if (!createRes.ok) {
-      const t = await createRes.text()
-      console.error('[approve-payout] create error', createRes.status, t)
-      // Rollback status
-      await supa.from('withdrawals').update({ status: 'pending_review' }).eq('id', withdrawal_id)
-      return new Response(JSON.stringify({ error: 'FedaPay create error', detail: t }), { status: 502 })
+    // 1. POST /v1/payouts UNIQUEMENT si on n'a pas déjà un fedapay_payout_id
+    if (fedapayId == null) {
+      const createRes = await fetch(`${FEDAPAY_BASE}/payouts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${FEDAPAY_SECRET}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: locked.fedapay_amount,
+          currency: { iso: 'XOF' },
+          mode: locked.receiver_provider,
+          merchant_reference: locked.merchant_reference,
+          customer: {
+            firstname: (locked.receiver_name as string).split(' ')[0],
+            lastname: (locked.receiver_name as string).split(' ').slice(1).join(' ') || locked.receiver_name,
+            phone_number: { number: locked.receiver_phone, country: locked.receiver_country },
+          },
+        }),
+      })
+
+      if (!createRes.ok) {
+        const t = await createRes.text()
+        console.error('[approve-payout] create error', createRes.status, t)
+        // Rollback status
+        await supa.from('withdrawals').update({ status: 'pending_review' }).eq('id', withdrawal_id)
+        return new Response(JSON.stringify({ error: 'FedaPay create error', detail: t }), { status: 502 })
+      }
+      const createBody = await createRes.json()
+      const payout = createBody['v1/payout'] ?? createBody?.payout ?? createBody
+      fedapayId = payout.id
+
+      // Persister TOUT DE SUITE pour qu'un retry après crash ne re-crée pas
+      await supa
+        .from('withdrawals')
+        .update({ fedapay_payout_id: fedapayId })
+        .eq('id', withdrawal_id)
     }
-    const createBody = await createRes.json()
-    const payout = createBody['v1/payout'] ?? createBody?.payout ?? createBody
-    const fedapayId: number = payout.id
 
     // 2. PUT /v1/payouts/{id}/start
     const startRes = await fetch(`${FEDAPAY_BASE}/payouts/${fedapayId}/start`, {
@@ -87,18 +101,13 @@ Deno.serve(async (req) => {
     if (!startRes.ok) {
       const t = await startRes.text()
       console.error('[approve-payout] start error', startRes.status, t)
-      // FedaPay payout existe mais pas démarré → on garde fedapay_payout_id mais status=pending_review
+      // Rollback status à pending_review (on garde fedapay_payout_id pour le retry idempotent)
       await supa
         .from('withdrawals')
-        .update({ status: 'pending_review', fedapay_payout_id: fedapayId })
+        .update({ status: 'pending_review' })
         .eq('id', withdrawal_id)
       return new Response(JSON.stringify({ error: 'FedaPay start error', detail: t }), { status: 502 })
     }
-
-    await supa
-      .from('withdrawals')
-      .update({ fedapay_payout_id: fedapayId })
-      .eq('id', withdrawal_id)
 
     return new Response(JSON.stringify({ ok: true, fedapay_payout_id: fedapayId }), { status: 200 })
   } catch (err) {
