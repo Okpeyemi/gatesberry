@@ -3,15 +3,17 @@
 -- Pré-requis : extensions pg_cron + pg_net activées (via Supabase
 -- Studio → Database → Extensions).
 --
--- Avant d'exécuter cette migration, REMPLACER manuellement les valeurs
--- entre <...> par les vraies (CRON_SECRET et project ref Supabase).
+-- IMPORTANT : avant d'exécuter, remplacer dans CHAQUE cron.schedule :
+--   - <PROJECT_REF>   par ton ref Supabase (ex. abcdefghijklmnop)
+--   - <CRON_SECRET>   par la valeur de CRON_SECRET (.env.local)
+--
+-- Note : on inline les valeurs dans le corps SQL du cron parce que
+-- le worker pg_cron de Supabase n'évalue pas `current_setting()` au
+-- runtime du job (les `ALTER DATABASE ... SET app.xxx` ne sont pas
+-- visibles dans le contexte d'exécution du cron). Le secret se
+-- retrouve donc dans cron.job — visible uniquement aux superusers
+-- du projet, ce qui est acceptable côté Supabase.
 -- ============================================================
-
--- Stocker le CRON_SECRET en setting Postgres (à exécuter une fois)
-ALTER DATABASE postgres SET app.cron_secret = '<TON_CRON_SECRET>';
-
--- Stocker l'URL de base des Edge Functions
-ALTER DATABASE postgres SET app.functions_url = 'https://<TON_PROJECT_REF>.supabase.co/functions/v1';
 
 -- Job 1 : auto-approve-batch toutes les minutes
 SELECT cron.schedule(
@@ -19,9 +21,9 @@ SELECT cron.schedule(
   '* * * * *',
   $$
     SELECT net.http_post(
-      url := current_setting('app.functions_url') || '/auto-approve-batch',
+      url := 'https://<PROJECT_REF>.supabase.co/functions/v1/auto-approve-batch',
       headers := jsonb_build_object(
-        'Authorization', 'Bearer ' || current_setting('app.cron_secret'),
+        'Authorization', 'Bearer <CRON_SECRET>',
         'Content-Type', 'application/json'
       ),
       body := '{}'::jsonb
@@ -35,9 +37,9 @@ SELECT cron.schedule(
   '*/5 * * * *',
   $$
     SELECT net.http_post(
-      url := current_setting('app.functions_url') || '/poll-payouts',
+      url := 'https://<PROJECT_REF>.supabase.co/functions/v1/poll-payouts',
       headers := jsonb_build_object(
-        'Authorization', 'Bearer ' || current_setting('app.cron_secret'),
+        'Authorization', 'Bearer <CRON_SECRET>',
         'Content-Type', 'application/json'
       ),
       body := '{}'::jsonb
