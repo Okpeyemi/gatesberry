@@ -6,14 +6,16 @@ import { createClient } from '@/utils/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Accueil', icon: 'hgi-home-09', exact: true },
-  { href: '/dashboard/transactions', label: 'Transactions', icon: 'hgi-arrow-turn-backward', exact: false },
-  { href: '/dashboard/products', label: 'Produits', icon: 'hgi-package', exact: false },
-  { href: '/dashboard/payment-pages', label: 'Pages de paiement', icon: 'hgi-link-square-01', exact: false },
-  { href: '/dashboard/settings', label: 'Paramètres', icon: 'hgi-settings-01', exact: false },
+  { href: '/dashboard',                    label: 'Accueil',           icon: 'hgi-home-09',             exact: true,  adminOnly: false },
+  { href: '/dashboard/transactions',       label: 'Transactions',      icon: 'hgi-arrow-turn-backward', exact: false, adminOnly: false },
+  { href: '/dashboard/products',           label: 'Produits',          icon: 'hgi-package',             exact: false, adminOnly: false },
+  { href: '/dashboard/payment-pages',      label: 'Pages de paiement', icon: 'hgi-link-square-01',      exact: false, adminOnly: false },
+  { href: '/dashboard/withdrawals',        label: 'Retraits',          icon: 'hgi-money-send-square',   exact: false, adminOnly: false },
+  { href: '/dashboard/settings',           label: 'Paramètres',        icon: 'hgi-settings-01',         exact: false, adminOnly: false },
+  { href: '/dashboard/admin/withdrawals',  label: 'Admin · Retraits',  icon: 'hgi-shield-01',           exact: false, adminOnly: true  },
 ]
 
-export default function Sidebar({ user }: { user: User }) {
+export default function Sidebar({ user, isAdmin }: { user: User; isAdmin: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -86,7 +88,7 @@ export default function Sidebar({ user }: { user: User }) {
 
       {/* ── Navigation ── */}
       <nav style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter(item => !item.adminOnly || isAdmin).map((item) => {
           const active = isActive(item.href, item.exact)
           return (
             <Link

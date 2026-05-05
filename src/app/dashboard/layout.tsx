@@ -16,7 +16,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // Vérification de l'onboarding
   const { data: profile } = await supabase
     .from('profiles')
-    .select('is_onboarded')
+    .select('is_onboarded, is_admin')
     .eq('id', user.id)
     .single()
 
@@ -26,7 +26,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
-      <Sidebar user={user} />
+      <Sidebar user={user} isAdmin={profile?.is_admin ?? false} />
       <main
         style={{
           flex: 1,
