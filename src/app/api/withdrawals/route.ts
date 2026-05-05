@@ -24,7 +24,13 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const body = await req.json()
+  let body: Record<string, unknown>
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Corps de requête invalide' }, { status: 400 })
+  }
+
   const { amount, receiver_name, receiver_phone, receiver_country, receiver_provider } = body as {
     amount: number
     receiver_name: string
@@ -47,27 +53,20 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Check 1 retrait par jour (non-final statuses count)
-  const { count: todayCount } = await admin
-    .from('withdrawals')
-    .select('id', { count: 'exact', head: true })
-    .eq('merchant_id', user.id)
-    .gte('created_at', new Date().toISOString().slice(0, 10))   // YYYY-MM-DD 00:00 UTC
-    .not('status', 'in', '(failed,rejected,cancelled)')
-  if ((todayCount ?? 0) >= 1) {
+  // Atomic : lock advisory + check 1/jour + check solde dans une seule transaction.
+  // Toute requête concurrente du même marchand attendra ce lock.
+  const { data: slot, error: slotErr } = await admin.rpc('acquire_withdrawal_slot', {
+    p_merchant_id: user.id,
+    p_fedapay_amount: fedapay_amount,
+  })
+  if (slotErr) {
+    console.error('[withdrawals] acquire_withdrawal_slot error:', slotErr)
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+  }
+  if (slot === 'duplicate') {
     return NextResponse.json({ error: 'Un seul retrait par jour' }, { status: 429 })
   }
-
-  // Check solde
-  const { data: balRow, error: balErr } = await admin.rpc('get_merchant_balance', {
-    p_merchant_id: user.id,
-  })
-  if (balErr) {
-    console.error('[withdrawals] get_merchant_balance error:', balErr)
-    return NextResponse.json({ error: 'Erreur de calcul du solde' }, { status: 500 })
-  }
-  const balance = typeof balRow === 'number' ? balRow : Number(balRow)
-  if (balance < fedapay_amount) {
+  if (slot === 'insufficient') {
     return NextResponse.json({ error: 'Solde insuffisant' }, { status: 400 })
   }
 
