@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { getOperatorRate, gatesberryFee } from '@/lib/fedapay/fees'
 
 const FEDAPAY_SECRET = process.env.FEDAPAY_SECRET_KEY!
 const FEDAPAY_ENV = process.env.FEDAPAY_ENVIRONMENT ?? 'sandbox'
@@ -8,23 +9,12 @@ const FEDAPAY_BASE =
     ? 'https://api.fedapay.com/v1'
     : 'https://sandbox-api.fedapay.com/v1'
 
-// Taux opérateur par (pays, provider)
-const OPERATOR_FEES: Record<string, Record<string, number>> = {
-  bj: { mtn: 1.8, moov: 1.8, celtiis: 1.8 },
-  ci: { wave: 4.0, mtn: 4.0, orange: 3.3 },
-  sn: { wave: 4.0, orange: 2.9, mixx: 2.0 },
-  tg: { moov: 2.5, mixx: 3.5 },
-  ml: { orange: 4.0 },
-  bf: { moov: 4.0, orange: 4.0 },
-  ne: { airtel: 4.0 },
-}
-
 /**
  * Calcule le montant total affiché au client (frais opérateur + Gatesberry inclus)
  * pour que le marchand reçoive exactement `merchantAmount` net.
  */
 function computeClientAmount(merchantAmount: number, country: string, provider: string) {
-  const opRate = OPERATOR_FEES[country]?.[provider] ?? 3.0
+  const opRate = getOperatorRate(country, provider)
 
   const gbRate = merchantAmount < 10000 ? 2 : 1
   const gbFixed = merchantAmount < 10000 ? 50 : 100
@@ -33,9 +23,7 @@ function computeClientAmount(merchantAmount: number, country: string, provider: 
 
   for (let i = 0; i < 500; i++) {
     const opFee = Math.round((clientPays * opRate) / 100)
-    const gbFee = clientPays < 10000
-      ? Math.round(clientPays * 0.02 + 50)
-      : Math.round(clientPays * 0.01 + 100)
+    const gbFee = gatesberryFee(clientPays)
     const net = clientPays - (opFee + gbFee)
     if (net === merchantAmount) break
     else if (net < merchantAmount) clientPays++
@@ -43,9 +31,7 @@ function computeClientAmount(merchantAmount: number, country: string, provider: 
   }
 
   const opFee = Math.round((clientPays * opRate) / 100)
-  const gbFee = clientPays < 10000
-    ? Math.round(clientPays * 0.02 + 50)
-    : Math.round(clientPays * 0.01 + 100)
+  const gbFee = gatesberryFee(clientPays)
 
   return { clientPays, opFee, gbFee, totalFee: opFee + gbFee }
 }
@@ -58,7 +44,7 @@ function computeClientAmount(merchantAmount: number, country: string, provider: 
  *   fedapayAmount + round(fedapayAmount * opRate / 100) = targetClientPays
  */
 function reverseFedapayAmount(targetClientPays: number, country: string, provider: string) {
-  const opRate = OPERATOR_FEES[country]?.[provider] ?? 3.0
+  const opRate = getOperatorRate(country, provider)
   let x = Math.floor(targetClientPays / (1 + opRate / 100))
 
   for (let i = 0; i < 500; i++) {
