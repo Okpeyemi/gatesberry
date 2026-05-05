@@ -7,6 +7,32 @@
  * Togocel T-Money, etc.), basée sur la tranche du montant brut envoyé.
  */
 
+/**
+ * Méthodes payout supportées par FedaPay (sous-ensemble strict de la
+ * grille inbound). Le marchand ne peut choisir que ces 5 combinaisons
+ * (countryCode, providerCode) pour un retrait.
+ */
+export type PayoutMethod = {
+  countryCode: string   // 'bj' | 'ci' | 'tg' | ...
+  countryLabel: string
+  providerCode: string  // valeur passée à FedaPay (mode du payout)
+  providerLabel: string
+}
+
+export const FEDAPAY_PAYOUT_METHODS: PayoutMethod[] = [
+  { countryCode: 'bj', countryLabel: 'Bénin',         providerCode: 'mtn',     providerLabel: 'MTN Mobile Money' },
+  { countryCode: 'bj', countryLabel: 'Bénin',         providerCode: 'moov',    providerLabel: 'MOOV Money' },
+  { countryCode: 'ci', countryLabel: "Côte d'Ivoire", providerCode: 'mtn',     providerLabel: 'MTN Mobile Money' },
+  { countryCode: 'tg', countryLabel: 'Togo',          providerCode: 'moov',    providerLabel: 'MOOV Money' },
+  { countryCode: 'tg', countryLabel: 'Togo',          providerCode: 'togocel', providerLabel: 'TOGOCEL T-Money' },
+]
+
+export function isPayoutMethodSupported(country: string, provider: string): boolean {
+  return FEDAPAY_PAYOUT_METHODS.some(
+    m => m.countryCode === country && m.providerCode === provider,
+  )
+}
+
 export type PayoutFeeTier = { max: number; fee: number }
 
 export const PAYOUT_FEE_TIERS: PayoutFeeTier[] = [

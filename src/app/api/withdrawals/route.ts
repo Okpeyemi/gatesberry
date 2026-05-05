@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { reverseFedapayPayoutAmount } from '@/lib/fedapay/payout-fees'
-import { FEDAPAY_OPERATOR_FEES } from '@/lib/fedapay/fees'
+import {
+  reverseFedapayPayoutAmount,
+  isPayoutMethodSupported,
+} from '@/lib/fedapay/payout-fees'
 
 const MIN_AMOUNT = 500
 const ADMIN_REVIEW_THRESHOLD = 100_000
-
-function isProviderSupported(country: string, provider: string) {
-  return FEDAPAY_OPERATOR_FEES.some(
-    e => e.countryCode === country && e.providers.some(p => p.code === provider),
-  )
-}
 
 /**
  * POST /api/withdrawals
@@ -45,7 +41,7 @@ export async function POST(req: NextRequest) {
   if (!receiver_name || !receiver_phone || !receiver_country || !receiver_provider) {
     return NextResponse.json({ error: 'Coordonnées incomplètes' }, { status: 400 })
   }
-  if (!isProviderSupported(receiver_country, receiver_provider)) {
+  if (!isPayoutMethodSupported(receiver_country, receiver_provider)) {
     return NextResponse.json({ error: 'Opérateur non supporté' }, { status: 400 })
   }
 

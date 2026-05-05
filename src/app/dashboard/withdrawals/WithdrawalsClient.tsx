@@ -1,8 +1,7 @@
 "use client"
 
 import { Fragment, useState, useMemo } from 'react'
-import { FEDAPAY_OPERATOR_FEES } from '@/lib/fedapay/fees'
-import { PAYOUT_FEE_TIERS } from '@/lib/fedapay/payout-fees'
+import { FEDAPAY_PAYOUT_METHODS, PAYOUT_FEE_TIERS } from '@/lib/fedapay/payout-fees'
 
 type Withdrawal = {
   id: string
@@ -232,15 +231,20 @@ function RequestModal({
   const [amount, setAmount] = useState('')
   const [name, setName] = useState(defaults.name)
   const [phone, setPhone] = useState(defaults.phone)
-  const [country, setCountry] = useState(defaults.country)
-  const providersForCountry = useMemo(() => {
-    const set = new Set<string>()
-    for (const e of FEDAPAY_OPERATOR_FEES) {
-      if (e.countryCode === country) e.providers.forEach(p => set.add(p.code))
-    }
-    return Array.from(set)
-  }, [country])
-  const [provider, setProvider] = useState(providersForCountry[0] ?? 'mtn')
+  // Pays/opérateurs supportés par les payouts FedaPay (5 méthodes)
+  const supportedCountries = useMemo(
+    () => Array.from(new Set(FEDAPAY_PAYOUT_METHODS.map(m => m.countryCode))),
+    [],
+  )
+  const initialCountry = supportedCountries.includes(defaults.country)
+    ? defaults.country
+    : (supportedCountries[0] ?? 'bj')
+  const [country, setCountry] = useState(initialCountry)
+  const providersForCountry = useMemo(
+    () => FEDAPAY_PAYOUT_METHODS.filter(m => m.countryCode === country),
+    [country],
+  )
+  const [provider, setProvider] = useState(providersForCountry[0]?.providerCode ?? 'mtn')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [submittedAmount, setSubmittedAmount] = useState<number | null>(null)
@@ -274,7 +278,6 @@ function RequestModal({
     else onClose()
   }
 
-  const countries = Array.from(new Set(FEDAPAY_OPERATOR_FEES.map(e => e.countryCode)))
 
   if (submittedAmount !== null) {
     return (
@@ -354,12 +357,19 @@ function RequestModal({
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
           <div>
             <label style={{ fontSize:12, color:'var(--color-text-muted)' }}>Pays</label>
-            <select value={country} onChange={(e) => { setCountry(e.target.value); setProvider('') }}
+            <select
+              value={country}
+              onChange={(e) => {
+                const c = e.target.value
+                setCountry(c)
+                const first = FEDAPAY_PAYOUT_METHODS.find(m => m.countryCode === c)
+                setProvider(first?.providerCode ?? '')
+              }}
               style={{ width:'100%', padding:'10px 12px', border:'1.5px solid var(--color-border)',
                        borderRadius:10, fontSize:14, marginTop:4, background:'#fff' }}>
-              {countries.map(c => (
+              {supportedCountries.map(c => (
                 <option key={c} value={c}>
-                  {FEDAPAY_OPERATOR_FEES.find(e => e.countryCode === c)?.countryLabel ?? c}
+                  {FEDAPAY_PAYOUT_METHODS.find(m => m.countryCode === c)?.countryLabel ?? c}
                 </option>
               ))}
             </select>
@@ -369,7 +379,9 @@ function RequestModal({
             <select value={provider} onChange={(e) => setProvider(e.target.value)}
               style={{ width:'100%', padding:'10px 12px', border:'1.5px solid var(--color-border)',
                        borderRadius:10, fontSize:14, marginTop:4, background:'#fff' }}>
-              {providersForCountry.map(p => <option key={p} value={p}>{p.toUpperCase()}</option>)}
+              {providersForCountry.map(m => (
+                <option key={m.providerCode} value={m.providerCode}>{m.providerLabel}</option>
+              ))}
             </select>
           </div>
         </div>
