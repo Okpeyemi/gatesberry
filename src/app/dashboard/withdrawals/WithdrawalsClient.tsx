@@ -88,7 +88,7 @@ export default function WithdrawalsClient({
   }
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '32px 24px' }}>
+    <div style={{ width:'100%', margin: '0 auto', padding: '32px 24px' }}>
       {/* Bandeau solde */}
       <div style={{
         background:'#fff', border:'1px solid var(--color-border)', borderRadius:16,
@@ -197,6 +197,7 @@ function RequestModal({
   const [provider, setProvider] = useState(providersForCountry[0] ?? 'mtn')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [submittedAmount, setSubmittedAmount] = useState<number | null>(null)
 
   const numericAmount = parseInt(amount, 10) || 0
   const setPercent = (p: number) => setAmount(String(Math.floor((balance * p) / 100)))
@@ -219,10 +220,46 @@ function RequestModal({
     })
     setSubmitting(false)
     if (!r.ok) { const e = await r.json().catch(() => ({})); setError(e.error ?? 'Erreur'); return }
-    await onSuccess()
+    setSubmittedAmount(numericAmount)
+  }
+
+  const handleClose = async () => {
+    if (submittedAmount !== null) await onSuccess()
+    else onClose()
   }
 
   const countries = Array.from(new Set(FEDAPAY_OPERATOR_FEES.map(e => e.countryCode)))
+
+  if (submittedAmount !== null) {
+    return (
+      <div onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}
+        style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex',
+                 alignItems:'center', justifyContent:'center', zIndex:200, padding:24 }}>
+        <div style={{ background:'#fff', borderRadius:16, width:'100%', maxWidth:440, padding:'32px 24px', textAlign:'center' }}>
+          <div style={{
+            width:56, height:56, borderRadius:'50%', background:'#dcfce7', color:'#15803d',
+            display:'inline-flex', alignItems:'center', justifyContent:'center', marginBottom:16,
+          }}>
+            <i className="hgi-stroke hgi-checkmark-circle-02" style={{ fontSize:28 }} />
+          </div>
+          <h2 style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:20, marginBottom:8 }}>
+            Demande envoyée
+          </h2>
+          <p style={{ fontSize:14, color:'var(--color-text)', marginBottom:6 }}>
+            Ta demande de retrait de <b>{formatAmount(submittedAmount)} XOF</b> est en cours de traitement.
+          </p>
+          <p style={{ fontSize:13, color:'var(--color-text-muted)', marginBottom:24 }}>
+            Le versement sera effectif dans un délai maximum de <b>24 heures</b>.
+          </p>
+          <button onClick={handleClose} style={{
+            padding:'10px 24px', borderRadius:10, border:'none',
+            background:'var(--color-accent)', color:'#fff', cursor:'pointer',
+            fontSize:13, fontWeight:600,
+          }}>Fermer</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
