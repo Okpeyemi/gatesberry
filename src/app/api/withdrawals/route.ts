@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Opérateur non supporté' }, { status: 400 })
   }
 
-  const { fedapay_amount, fee } = reverseFedapayPayoutAmount(amount, receiver_country, receiver_provider)
+  const { fedapay_amount, fee } = reverseFedapayPayoutAmount(amount)
 
   const admin = createAdminClient()
 
