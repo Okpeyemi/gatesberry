@@ -96,7 +96,7 @@ export default function AdminWithdrawalsClient({
   }
 
   return (
-    <div style={{ maxWidth:1100, margin:'0 auto', padding:'32px 24px' }}>
+    <div style={{ width:'100%', margin:'0 auto', padding:'32px 24px' }}>
       <h1 style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:24, marginBottom:6 }}>
         Retraits — vue admin
       </h1>
