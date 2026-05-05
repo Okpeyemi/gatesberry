@@ -93,10 +93,11 @@ Deno.serve(async (req) => {
         .eq('id', withdrawal_id)
     }
 
-    // 2. PUT /v1/payouts/{id}/start
-    const startRes = await fetch(`${FEDAPAY_BASE}/payouts/${fedapayId}/start`, {
+    // 2. PUT /v1/payouts/start (URL fixe, body avec liste des id à démarrer)
+    const startRes = await fetch(`${FEDAPAY_BASE}/payouts/start`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${FEDAPAY_SECRET}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payouts: [{ id: fedapayId }] }),
     })
     if (!startRes.ok) {
       const t = await startRes.text()
